@@ -5,14 +5,15 @@
 
 **/
 
+#include <SoftwareSerial.h>
+
 // State variables
 bool isDefaultState = false;
-enum Antenna {Antenna1 = 1, Antenna2 = 2, Antenna3 = 4};
-#define Antenna1 1
-#define Antenna2 2
-#define Anntena3 4
-
-
+enum Antenna { NoAntenna,
+               Antenna1,
+               Antenna2,
+               Antenna3,
+               AntennaErr };
 
 // IR Sensor Pins
 #define IR1 11
@@ -23,14 +24,21 @@ enum Antenna {Antenna1 = 1, Antenna2 = 2, Antenna3 = 4};
 #define Relay2 9
 #define Relay3 10
 
+#define rxPython 3
+#define txPython 4
+#define rxRFID 6
+#define txRFID 7
+
 // Serial communications
 #define Logger Serial
-#define Python Serial1
-#define RFID Serial2
-
+#define NULL_REPLY ""
+#define ERR_REPLY "ERR"
+SoftwareSerial Python = SoftwareSerial(rxPython, txPython);
+SoftwareSerial RFID = SoftwareSerial(rxRFID, txRFID);
 
 // Setup
 void setup() {
+
   // Serial setups
   Logger.begin(9600);
   Logger.setTimeout(300);
@@ -38,6 +46,9 @@ void setup() {
   Python.begin(9600);
 
   RFID.begin(9600);
+
+  Python.read();
+  RFID.read();
 
 
   // IR sensor setups
@@ -48,17 +59,31 @@ void setup() {
   pinMode(Relay1, INPUT);
   pinMode(Relay2, INPUT);
   pinMode(Relay3, INPUT);
+  pinMode(13, OUTPUT);
 
   // Startup state
   defaultState();
 }
 
-
+bool state = false;
 void loop() {
   if (!isDefaultState) {
     defaultState();
     isDefaultState = true;
   }
+
+  if (Python.available() > 0) {
+    Python.readString();
+    state ^= true;
+    if (state == true) {
+      digitalWrite(13, HIGH);
+      state == false;
+    }  
+    else
+      digitalWrite(13, LOW);
+  }
+
+  delay(1000);
 }
 
 
@@ -70,8 +95,20 @@ void defaultState() {
 }
 
 
+// Returns which antenna is current selected
 int activeAntenna() {
-  return digitalRead(Relay1) + 2 * digitalRead(Relay2) + 4 * digitalRead(Relay3);
+  switch (1 * digitalRead(Relay1) + 2 * digitalRead(Relay2) + 4 * digitalRead(Relay3)) {
+    case 0:
+      return NoAntenna;
+    case 1:
+      return Antenna1;
+    case 2:
+      return Antenna2;
+    case 4:
+      return Antenna3;
+    default:
+      return AntennaErr;
+  }
 }
 
 /** Logger explanation
@@ -99,27 +136,52 @@ void writePython(String message) {
 }
 
 String readRFID() {
-  String message = RFID.readString();
-  Logger.print("RFID, IN, ");
-  Logger.println(message);
-  return message;
+  int active = activeAntenna();
+  if (active == Antenna1 || active == Antenna2 || active == Antenna3) {
+    String message = RFID.readString();
+    Logger.print("RFID");
+    Logger.print(active);
+    Logger.print(", IN, ");
+    Logger.println(message);
+    return message;
+  } else if (active == NoAntenna) {
+    Logger.print("RFID");
+    Logger.print(active);
+    //NSNR - None Selected Not Recieved
+    Logger.print(", IN, NSNR:");
+    Logger.println(NULL_REPLY);
+    return (NULL_REPLY);
+  } else if (active == AntennaErr) {
+    Logger.print("RFID");
+    Logger.print(active);
+    //NSNR - Selection Error Not Recieved
+    Logger.print(", OUT, SENR:");
+    Logger.println(ERR_REPLY);
+    return ERR_REPLY;
+  }
 }
 
 void writeRFID(String message, Antenna antenna) {
-  if(antenna == activeAntenna()) {
+  int active = activeAntenna();
+  if (active == antenna) {
     RFID.print(message);
     Logger.print("RFID");
     Logger.print(antenna);
     Logger.print(", OUT, ");
     Logger.println(message);
-  }
-  else {
+  } else if (active == NoAntenna) {
+    RFID.print(message);
     Logger.print("RFID");
     Logger.print(antenna);
-    Logger.print(", OUT, ");
-    Logger.print("NR: ");
+    //NSNR - None Selected Not Recieved
+    Logger.print(", OUT, NSNR:");
+    Logger.println(message);
+  } else if (active == AntennaErr) {
+    RFID.print(message);
+    Logger.print("RFID");
+    Logger.print(antenna);
+    //NSNR - Selection Error Not Recieved
+    Logger.print(", OUT, SENR:");
     Logger.println(message);
   }
-  
-  
 }
