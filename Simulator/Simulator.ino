@@ -56,6 +56,18 @@ void defaultState() {
   digitalWrite(IR3, HIGH);
 }
 
+
+/**
+ * Logger explanation
+ * By using read/write Python and read/write RFID functions, all information communicated
+ * via serial is written to computer attached to simulator by USB (AKA Logger)
+ * 
+ * Remaining challenges:
+ * How do we make sure that Python responds in a timely manner? Polling could work, but might
+ * be a bit slow. Maybe can use interrupt to detect when Python.available() flag is set?
+
+
+*/
 String readPython() {
   String message = Python.readString();
   Logger.print("PYTHON, IN, ");
