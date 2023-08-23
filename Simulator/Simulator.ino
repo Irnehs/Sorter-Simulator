@@ -41,11 +41,13 @@ void setup() {
 
   // Serial setups
   Logger.begin(9600);
-  Logger.setTimeout(300);
+  Logger.setTimeout(250);
 
   Python.begin(9600);
+  Python.setTimeout(250);
 
   RFID.begin(9600);
+  RFID.setTimeout(250);
 
   Python.read();
   RFID.read();
