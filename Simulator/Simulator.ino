@@ -207,4 +207,10 @@ void waitForRFID(String message) {
   }
 }
 
+void startExperiment() {
+  waitForRFID("SRA\r");
+  waitForPython("Arduino Ready");
+  pythonWrite("0");
+  waitForPython("Begin Experiment");
+
   
