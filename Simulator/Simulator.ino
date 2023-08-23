@@ -170,14 +170,14 @@ void writeRFID(String message, Antenna antenna) {
     Logger.print(antenna);
     Logger.print(", OUT, ");
     Logger.println(message);
-  } else if (active == NoAntenna) {
+  } else if (active == NoAntenna || antenna == NoAntenna) {
     RFID.print(message);
     Logger.print("RFID");
     Logger.print(antenna);
     //NSNR - None Selected Not Recieved
     Logger.print(", OUT, NSNR:");
     Logger.println(message);
-  } else if (active == AntennaErr) {
+  } else if (active == AntennaErr || antenna == AntennaErr) {
     RFID.print(message);
     Logger.print("RFID");
     Logger.print(antenna);
@@ -187,4 +187,24 @@ void writeRFID(String message, Antenna antenna) {
   }
 }
 
-void writeRFID
+void waitForPython(String message) {
+  while(1) {
+    while(Python.available() == 0) {}
+    String readstring = readPython();
+    if(readstring == message) {
+      return;
+    }
+  }
+}
+
+void waitForRFID(String message) {
+  while(1) {
+    while(RFID.available() == 0) {}
+    String readstring = readRFID();
+    if(readstring == message) {
+      return;
+    }
+  }
+}
+
+  
