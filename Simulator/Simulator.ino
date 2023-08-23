@@ -211,6 +211,17 @@ void startExperiment() {
   waitForRFID("SRA\r");
   waitForPython("Arduino Ready");
   pythonWrite("0");
-  waitForPython("Begin Experiment");
+  waitForPython("Begin Experiment"); 
+  pythonWrite("3"); // numMice
+  pythonWrite("10"); // maxEntries
+  String[] miceID = ["111111111111", "222222222222", "333333333333"];
+  for(int i = 0; i<3; i++) {
+    pythonWrite(miceID[i]);
+    waitForPython(miceID[i]);
+    waitForPython(i.toString());
+  }
+  waitForPython("Experiment Timer Started");
+  }
+
 
   
