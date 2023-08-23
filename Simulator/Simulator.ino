@@ -61,8 +61,7 @@ void setup() {
   pinMode(Relay1, INPUT);
   pinMode(Relay2, INPUT);
   pinMode(Relay3, INPUT);
-  pinMode(13, OUTPUT);
-
+ 
   // Startup state
   defaultState();
 }
@@ -156,7 +155,7 @@ String readRFID() {
   } else if (active == AntennaErr) {
     Logger.print("RFID");
     Logger.print(active);
-    //NSNR - Selection Error Not Recieved
+    //SENR - Selection Error Not Recieved
     Logger.print(", OUT, SENR:");
     Logger.println(ERR_REPLY);
     return ERR_REPLY;
@@ -187,3 +186,5 @@ void writeRFID(String message, Antenna antenna) {
     Logger.println(message);
   }
 }
+
+void writeRFID
