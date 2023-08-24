@@ -20,21 +20,19 @@ enum Antenna { NoAntenna,
 #define IR2 12
 #define IR3 13
 
+
+// Relay inputs
 #define Relay1 8
 #define Relay2 9
 #define Relay3 10
 
 // Serial communications
 #define Logger Serial
-#define Python Serial1
-#define RFID Serial2
+#define Python Serial1 //RX 19 Tx 20
+#define RFID Serial2  // RX 21 TX 22
 #define NULL_REPLY ""
 #define ERR_REPLY "ERR"
 
-#define SEND_DELAY 500
-#define INPUT_LATENCY 500
-
-String* messagePtr;
 // Setup
 void setup() {
 
@@ -182,7 +180,6 @@ void writePython(String message) {
   Logger.print("PYTHON, OUT, ");
   Logger.print(message);
   Logger.println("[END]");
-  delay(SEND_DELAY);
 }
 
 String readRFID() {
