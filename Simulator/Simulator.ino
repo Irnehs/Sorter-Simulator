@@ -33,22 +33,24 @@ enum Antenna { NoAntenna,
 #define Logger Serial
 #define NULL_REPLY ""
 #define ERR_REPLY "ERR"
-SoftwareSerial Python = SoftwareSerial(rxPython, txPython);
-SoftwareSerial RFID = SoftwareSerial(rxRFID, txRFID);
+#define Python Serial1
+#define RFID Serial2
 
 // Setup
 void setup() {
 
   // Serial setups
+  // Logger.begin(9600);
+  // Logger.setTimeout(300);
   Logger.begin(9600);
-  Logger.setTimeout(300);
+  Logger.setTimeout(100);
+
 
   Python.begin(9600);
+  Python.setTimeout(100);
 
   RFID.begin(9600);
-
-  Python.read();
-  RFID.read();
+  RFID.setTimeout(100);
 
 
   // IR sensor setups
@@ -59,31 +61,26 @@ void setup() {
   pinMode(Relay1, INPUT);
   pinMode(Relay2, INPUT);
   pinMode(Relay3, INPUT);
-  pinMode(13, OUTPUT);
 
   // Startup state
   defaultState();
+  Python.readString();
+  RFID.readString();
+  Logger.readString();
 }
 
 bool state = false;
 void loop() {
-  if (!isDefaultState) {
-    defaultState();
-    isDefaultState = true;
+  // if (!isDefaultState) {
+  //   defaultState();
+  //   isDefaultState = true;
+  // }
+  if(Python.available() > 0) {
+    readPython();
   }
-
-  if (Python.available() > 0) {
-    Python.readString();
-    state ^= true;
-    if (state == true) {
-      digitalWrite(13, HIGH);
-      state == false;
-    }  
-    else
-      digitalWrite(13, LOW);
+  if(Logger.available() > 0) {
+    writePython(Logger.readString());
   }
-
-  delay(1000);
 }
 
 
@@ -142,7 +139,7 @@ String readRFID() {
     Logger.print("RFID");
     Logger.print(active);
     Logger.print(", IN, ");
-    Logger.println(message);
+    Logger.print(message);
     return message;
   } else if (active == NoAntenna) {
     Logger.print("RFID");
