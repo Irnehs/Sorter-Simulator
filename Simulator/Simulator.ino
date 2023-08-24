@@ -24,30 +24,29 @@ enum Antenna { NoAntenna,
 #define Relay2 9
 #define Relay3 10
 
-#define rxPython 3
-#define txPython 4
-#define rxRFID 6
-#define txRFID 7
-
 // Serial communications
 #define Logger Serial
+#define Python Serial1
+#define RFID Serial2
 #define NULL_REPLY ""
 #define ERR_REPLY "ERR"
-SoftwareSerial Python = SoftwareSerial(rxPython, txPython);
-SoftwareSerial RFID = SoftwareSerial(rxRFID, txRFID);
 
+#define SEND_DELAY 500
+#define INPUT_LATENCY 500
+
+String* messagePtr;
 // Setup
 void setup() {
 
   // Serial setups
   Logger.begin(9600);
-  Logger.setTimeout(250);
+  Logger.setTimeout(100);
 
   Python.begin(9600);
-  Python.setTimeout(250);
+  Python.setTimeout(100);
 
   RFID.begin(9600);
-  RFID.setTimeout(250);
+  RFID.setTimeout(100);
 
   Python.read();
   RFID.read();
@@ -61,32 +60,78 @@ void setup() {
   pinMode(Relay1, INPUT);
   pinMode(Relay2, INPUT);
   pinMode(Relay3, INPUT);
- 
+
   // Startup state
   defaultState();
 }
 
 bool state = false;
 void loop() {
-  if (!isDefaultState) {
-    defaultState();
-    isDefaultState = true;
-  }
-
-  if (Python.available() > 0) {
-    Python.readString();
-    state ^= true;
-    if (state == true) {
-      digitalWrite(13, HIGH);
-      state == false;
-    }  
-    else
-      digitalWrite(13, LOW);
-  }
-
-  delay(1000);
+  userInput();
 }
 
+void userInput() {
+  Logger.println("\nStart User Input");
+  while (1) {
+
+    if (Python.available() > 0) {
+      readPython();
+    }
+
+    if (RFID.available() > 0) {
+      readRFID();
+    }
+
+    if (Logger.available() > 0) {
+      String input = Logger.readString();
+      if (input.startsWith("P:")) {
+        writePython(input.substring(2, input.length()));
+      } else if (input.startsWith("A")) {
+        Antenna antenna;
+        switch (input.substring(1, 2).toInt()) {
+          case 1:
+            antenna = Antenna1;
+            break;
+          case 2:
+            antenna = Antenna2;
+            break;
+          case 3:
+            antenna = Antenna3;
+          default:
+            antenna = AntennaErr;
+        }
+        writeRFID(input.substring(3, input.length()), antenna);
+      } else if (input.startsWith("IR")) {
+        uint8_t state;
+        if(input.substring(3,4) == "L") {
+          state = LOW;
+        }
+        else {
+          state = HIGH;
+        }
+      
+        
+        int irSensor;
+        switch (input.substring(2, 3).toInt()) {
+          case 1:
+            irSensor = IR1;
+            break;
+          case 2:
+            irSensor = IR2;
+            break;
+          case 3:
+            irSensor = IR3;
+        }
+        Logger.println("Pin " + String(irSensor) + ": " + String(state));
+        digitalWrite(irSensor, state);
+      }
+      else if (input == "END") {
+        Serial.println("End User Input");
+        return;
+      }
+    }
+  }
+}
 
 // Default state: all IR sensors beams not broken and no antenna selected
 void defaultState() {
@@ -127,7 +172,8 @@ String readPython() {
   String message = Python.readString();
   Logger.print("PYTHON, IN, ");
   Logger.print(message);
-  Logger.println("[END]")
+  Logger.println("[END]");
+  Logger.flush();
   return message;
 }
 
@@ -135,11 +181,13 @@ void writePython(String message) {
   Python.print(message);
   Logger.print("PYTHON, OUT, ");
   Logger.print(message);
-  Logger.pritnln("[END]");
+  Logger.println("[END]");
+  delay(SEND_DELAY);
 }
 
 String readRFID() {
-  int active = activeAntenna();
+  int active = Antenna1;
+  // int active = activeAntenna();
   if (active == Antenna1 || active == Antenna2 || active == Antenna3) {
     String message = RFID.readString();
     Logger.print("RFID");
@@ -190,40 +238,3 @@ void writeRFID(String message, Antenna antenna) {
   }
 }
 
-void waitForPython(String message) {
-  while(1) {
-    while(Python.available() == 0) {}
-    String readstring = readPython();
-    if(readstring == message) {
-      return;
-    }
-  }
-}
-
-void waitForRFID(String message) {
-  while(1) {
-    while(RFID.available() == 0) {}
-    String readstring = readRFID();
-    if(readstring == message) {
-      return;
-    }
-  }
-}
-
-void startExperiment() {
-  waitForRFID("SRA\r");
-  waitForPython("Arduino Ready");
-  pythonWrite("0");
-  waitForPython("Begin Experiment"); 
-  pythonWrite("3"); // numMice
-  pythonWrite("10"); // maxEntries
-  String[] miceID = ["111111111111", "222222222222", "333333333333"];
-  for(int i = 0; i<3; i++) {
-    pythonWrite(miceID[i]);
-    waitForPython(miceID[i]);
-    waitForPython(i.toString());
-  }
-  waitForPython("Experiment Timer Started");
-  }
-
-  

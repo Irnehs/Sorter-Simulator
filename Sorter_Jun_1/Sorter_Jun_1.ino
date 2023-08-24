@@ -156,8 +156,12 @@ void setup() {
   //Python transfers relevant variables/arrays to Arduino
   while (Serial.available() == 0) {}
   numMice = Serial.readString().toInt();
+
+  Serial.print("Num mice: " + String(numMice));
+
   while (Serial.available() == 0) {}
   maxEntries = Serial.readString().toInt();
+  Serial.println("Max entries: " + maxEntries);
 
   int i = 0;
   while (i < numMice) {
@@ -241,7 +245,6 @@ void loop() {
       while (mouseZone1 != IDarray[check]) {
         check++;
       }
-
 
       //Send signal to Python to get the updated Timeout status of each mouse
       Serial.println("Update Timeout");
@@ -1220,6 +1223,7 @@ AllowEntry:
         tORf = true;
         while (tORf == true) {
           Serial1.write("LTG\r");
+          while(Serial1.available() == 0) {}
           if (Serial1.readString() == "?1\r") {
             tORf = false;
           }
@@ -1237,7 +1241,7 @@ AllowEntry:
 
       } else if (sensorState3 == HIGH) {
         MouseInCenter = false;
-        Serial.println("Mouse  not in tube");
+        Serial.println("Mouse not in tube");
       }
 
       //Mouse stuck
