@@ -7,14 +7,6 @@
 
 #include <SoftwareSerial.h>
 
-// State variables
-bool isDefaultState = false;
-enum Antenna { NoAntenna,
-               Antenna1,
-               Antenna2,
-               Antenna3,
-               AntennaErr };
-
 // IR Sensor Pins
 #define IR1 11
 #define IR2 12
@@ -27,11 +19,21 @@ enum Antenna { NoAntenna,
 #define Relay3 10
 
 // Serial communications
+// Make sure both Arduinos share a common ground, and that the USB on Sorter is never 
+// plugged in at the same time as Pins 0/1
 #define Logger Serial
 #define Python Serial1 //RX 19 Tx 20
 #define RFID Serial2  // RX 21 TX 22
 #define NULL_REPLY ""
 #define ERR_REPLY "ERR"
+
+
+// State variables
+enum Antenna { NoAntenna,
+               Antenna1,
+               Antenna2,
+               Antenna3,
+               AntennaErr };
 
 // Setup
 void setup() {
@@ -63,7 +65,6 @@ void setup() {
   defaultState();
 }
 
-bool state = false;
 void loop() {
   userInput();
 }
