@@ -1,6 +1,7 @@
 /** Simulator.ino
   * Last modified 8/24/23
   * Simulates IR sensors and Serial communication
+  * When updating Sorter code, ensure PINS 0,1, and reset are unplugged
 **/
 
 #include <SoftwareSerial.h>
@@ -34,7 +35,7 @@ enum Antenna { NoAntenna,
                Antenna1,
                Antenna2,
                Antenna3,
-               AntennaErr };
+               AntennaErr = 5 };
 
 String messageToWait = "";
 int waitTime = 1000;
@@ -51,8 +52,9 @@ void setup() {
   RFID.begin(9600);
   RFID.setTimeout(100);
 
-  Python.read();
-  RFID.read();
+  Logger.readString();
+  Python.readString();
+  RFID.readString();
 
 
   // IR sensor setups
@@ -64,7 +66,7 @@ void setup() {
   pinMode(Relay2, INPUT);
   pinMode(Relay3, INPUT);
 
-  pinMode(RESET,OUTPUT);
+  pinMode(RESET, OUTPUT);
   digitalWrite(RESET, HIGH);
 
   // Startup state
@@ -76,7 +78,7 @@ void loop() {
 }
 
 void userInput() {
-  Logger.println("\nStart User Input");
+  Logger.println("\nSTART USER INPUT\n");
   while (1) {
 
     if (Python.available() > 0) {
@@ -136,13 +138,37 @@ void userInput() {
         Logger.print("Will wait for: ");
         Logger.print(String(waitTime));
         Logger.println(" ms");
-      }  else if (input == "SETUP") {
-        setupExperiment();
-      }
-      else if(input == "RESET") {
+      } else if (input == "SETUP") {
+        Logger.println("PREPPING SETUP:");
+        Logger.print("Num mice: ");
+        while(Logger.available() == 0) {}
+        int numMice = Logger.readString().toInt();
+        Logger.println(numMice);
+        Logger.print("Entries: ");
+        while(Logger.available() == 0) {}
+        int entries = Logger.readString().toInt();
+        Logger.println(entries);
+        setupExperiment(numMice, entries);
+      } else if (input == "ENTER") {
+        Logger.println("PREPPING ENTRY");
+        Logger.print("Num mice: ");
+        while(Logger.available() == 0) {}
+        int numMice = Logger.readString().toInt();
+        Logger.println(String(numMice));
+        Logger.print("Mouse to enter: ");
+        while(Logger.available() == 0) {}
+        int entering = Logger.readString().toInt();
+        Logger.println(entering);
+        startSession(numMice, entering);
+      } else if (input == "RESET") {
         reset();
-      }
-      else if (input == "END") {
+      } else if (input == "QA") {
+        Logger.println("Active Antenna: " + String(activeAntenna()));
+      } else if (input == "QIR") {
+        Logger.println("IR1: " + String(digitalRead(IR1)));
+        Logger.println("IR2: " + String(digitalRead(IR2)));
+        Logger.println("IR3: " + String(digitalRead(IR3)));
+      } else if (input == "QUIT") {
         Logger.println("End User Input");
         return;
       }
@@ -201,7 +227,7 @@ void writePython(String message) {
 }
 
 String readRFID() {
-  int active = Antenna1;
+  int active = activeAntenna();
   // int active = activeAntenna();
   if (active == Antenna1 || active == Antenna2 || active == Antenna3) {
     String message = RFID.readString();
@@ -253,7 +279,7 @@ void writeRFID(String message, Antenna antenna) {
   }
 }
 
-void waitForPython(String message, int timeout) {
+void waitForPython(String message, int timeout = 3000) {
   elapsedMillis timeoutTimer;
   String buffer = "";
   char byteBuffer[1];
@@ -281,8 +307,7 @@ void waitForPython(String message, int timeout) {
     Logger.print(buffer);
     Logger.println("[END]\n");
     userInput();
-  }
-  else {
+  } else {
     Logger.print("TIMER, PYTHON, PASS [");
     Logger.print(timeoutTimer);
     Logger.print("/");
@@ -295,26 +320,27 @@ void waitForPython(String message, int timeout) {
 
 
 // Successfully sets up experiment with 2 dummy mice
-void setupExperiment() {
+void setupExperiment(int numMice, int entries) {
+  Python.readString();
   Logger.println("SETUP STARTING\n");
   reset();
-  String mouseID[2] = {"000000000000", "111111111111"};
-  String mouseRFID[2] = {"0000000000000000", "1111111111111111"};
+  String mouseID[4] = { "000000000000", "111111111111", "222222222222", "333333333333" };
+  String mouseRFID[4] = { "0000000000000000", "1111111111111111", "2222222222222222", "3333333333333333" };
   waitForPython("Arduino Ready", 15000);
   writePython("0");
-  waitForPython("Begin Experiment", 10000);
-  writePython("2");
-  waitForPython("Num mice: 2", 2000);
-  writePython("10");
-  waitForPython("Max entries: 10", 2000);
-  for(int i = 0; i < 2; i++) {
+  waitForPython("Begin Experiment", 15000);
+  writePython(String(numMice));
+  waitForPython("Num mice: " + String(numMice), 2000);
+  writePython(String(entries));
+  waitForPython("Max entries: " + String(entries), 2000);
+  for (int i = 0; i < numMice; i++) {
     writePython(mouseID[i]);
     waitForPython(mouseID[i], 2000);
     waitForPython(String(i), 2000);
   }
   waitForPython("Experiment Timer Started", 5000);
 
-  Logger.println("SETUP DONE\n");  
+  Logger.println("SETUP DONE FOR " + String(numMice) + " MICE\n");
 }
 
 void reset() {
@@ -322,4 +348,33 @@ void reset() {
   digitalWrite(RESET, LOW);
   delay(100);
   digitalWrite(RESET, HIGH);
+}
+
+void startSession(int numMice, int mouse) {
+  Logger.println("STARTING ENTRY\n");
+  String mouseID[4] = { "000000000000", "111111111111", "222222222222", "333333333333" };
+  String mouseRFID[4] = { "0000000000000000", "1111111111111111", "2222222222222222", "3333333333333333" };
+  writeRFID(mouseRFID[0], Antenna1);
+  waitForPython("Check Exp Time");
+  writePython("1");
+  waitForPython("Update Timeout");
+  String timeoutString = "";
+  for(int i = 0; i < numMice; i++) {
+    timeoutString = timeoutString + "1";
+  }
+  writePython(timeoutString);
+  waitForPython("1");
+  waitForPython("1");
+  waitForPython("G1 Open");
+  writeRFID(mouseRFID[mouse], Antenna2);
+  digitalWrite(IR3, LOW);
+  waitForPython("G1 close", 5000);
+  waitForPython("Mouse in tube");
+  writeRFID(mouseRFID[mouse], Antenna2);
+  waitForPython("Only 1 Mouse");
+  waitForPython("G2 Open");
+  writeRFID(mouseRFID[mouse], Antenna3);
+  digitalWrite(IR3, HIGH);
+  waitForPython("StartMED:");
+  Logger.println("SESSION STARTED FOR MOUSE " + String(mouse) + "\n");
 }

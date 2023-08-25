@@ -380,6 +380,8 @@ AllowEntry:
 
               ///Wait for trigger @ Antenna 3, close Gate 2
               while (Serial1.available() == 0) {}
+              // ERROR: Need to empty out Serial1 FIXED
+              Serial1.readString();
               /////////////ADD some code here to store the ID value and check zone 3 = zone 2 to final check
 
               //Close gate 2 slowly
