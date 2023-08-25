@@ -161,7 +161,7 @@ void setup() {
 
   while (Serial.available() == 0) {}
   maxEntries = Serial.readString().toInt();
-  Serial.println("Max entries: " + maxEntries);
+  Serial.println("Max entries: " + String(maxEntries));
 
   int i = 0;
   while (i < numMice) {

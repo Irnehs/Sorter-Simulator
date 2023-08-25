@@ -1,17 +1,18 @@
 /** Simulator.ino
-  * Last modified 8/21/23
-  * Idea is to simulate IR sensors and serial communications for testing
-  * Outputs Serial information
-
+  * Last modified 8/24/23
+  * Simulates IR sensors and Serial communication
 **/
 
 #include <SoftwareSerial.h>
+#include <elapsedMillis.h>
 
 // IR Sensor Pins
 #define IR1 11
 #define IR2 12
 #define IR3 13
 
+// Reset connection
+#define RESET 7
 
 // Relay inputs
 #define Relay1 8
@@ -19,11 +20,11 @@
 #define Relay3 10
 
 // Serial communications
-// Make sure both Arduinos share a common ground, and that the USB on Sorter is never 
+// Make sure both Arduinos share a common ground, and that the USB on Sorter is never
 // plugged in at the same time as Pins 0/1
 #define Logger Serial
-#define Python Serial1 //RX 19 Tx 20
-#define RFID Serial2  // RX 21 TX 22
+#define Python Serial1  //RX 19 Tx 20
+#define RFID Serial2    // RX 21 TX 22
 #define NULL_REPLY ""
 #define ERR_REPLY "ERR"
 
@@ -35,6 +36,8 @@ enum Antenna { NoAntenna,
                Antenna3,
                AntennaErr };
 
+String messageToWait = "";
+int waitTime = 1000;
 // Setup
 void setup() {
 
@@ -60,6 +63,9 @@ void setup() {
   pinMode(Relay1, INPUT);
   pinMode(Relay2, INPUT);
   pinMode(Relay3, INPUT);
+
+  pinMode(RESET,OUTPUT);
+  digitalWrite(RESET, HIGH);
 
   // Startup state
   defaultState();
@@ -102,14 +108,13 @@ void userInput() {
         writeRFID(input.substring(3, input.length()), antenna);
       } else if (input.startsWith("IR")) {
         uint8_t state;
-        if(input.substring(3,4) == "L") {
+        if (input.substring(3, 4) == "L") {
           state = LOW;
-        }
-        else {
+        } else {
           state = HIGH;
         }
-      
-        
+
+
         int irSensor;
         switch (input.substring(2, 3).toInt()) {
           case 1:
@@ -123,9 +128,22 @@ void userInput() {
         }
         Logger.println("Pin " + String(irSensor) + ": " + String(state));
         digitalWrite(irSensor, state);
+      } else if (input.startsWith("WM:")) {
+        messageToWait = input.substring(3, input.length());
+        Logger.println("Will wait for:" + messageToWait);
+      } else if (input.startsWith("WT:")) {
+        waitTime = input.substring(3, input.length()).toInt();
+        Logger.print("Will wait for: ");
+        Logger.print(String(waitTime));
+        Logger.println(" ms");
+      }  else if (input == "SETUP") {
+        setupExperiment();
+      }
+      else if(input == "RESET") {
+        reset();
       }
       else if (input == "END") {
-        Serial.println("End User Input");
+        Logger.println("End User Input");
         return;
       }
     }
@@ -171,8 +189,7 @@ String readPython() {
   String message = Python.readString();
   Logger.print("PYTHON, IN, ");
   Logger.print(message);
-  Logger.println("[END]");
-  Logger.flush();
+  Logger.println("[END]\n");
   return message;
 }
 
@@ -180,7 +197,7 @@ void writePython(String message) {
   Python.print(message);
   Logger.print("PYTHON, OUT, ");
   Logger.print(message);
-  Logger.println("[END]");
+  Logger.println("[END]\n");
 }
 
 String readRFID() {
@@ -192,21 +209,21 @@ String readRFID() {
     Logger.print(active);
     Logger.print(", IN, ");
     Logger.print(message);
-    Logger.println("[END]");
+    Logger.println("[END]\n");
     return message;
   } else if (active == NoAntenna) {
     Logger.print("RFID");
     Logger.print(active);
     //NSNR - None Selected Not Recieved
     Logger.print(", IN, NSNR:");
-    Logger.println(NULL_REPLY);
+    Logger.println(NULL_REPLY + String("\n"));
     return (NULL_REPLY);
   } else if (active == AntennaErr) {
     Logger.print("RFID");
     Logger.print(active);
     //SENR - Selection Error Not Recieved
     Logger.print(", OUT, SENR:");
-    Logger.println(ERR_REPLY);
+    Logger.println(ERR_REPLY + String("\n"));
     return ERR_REPLY;
   }
 }
@@ -218,21 +235,91 @@ void writeRFID(String message, Antenna antenna) {
     Logger.print("RFID");
     Logger.print(antenna);
     Logger.print(", OUT, ");
-    Logger.println(message);
+    Logger.println(message + "\n");
   } else if (active == NoAntenna || antenna == NoAntenna) {
     RFID.print(message);
     Logger.print("RFID");
     Logger.print(antenna);
     //NSNR - None Selected Not Recieved
     Logger.print(", OUT, NSNR:");
-    Logger.println(message);
+    Logger.println(message + "\n");
   } else if (active == AntennaErr || antenna == AntennaErr) {
     RFID.print(message);
     Logger.print("RFID");
     Logger.print(antenna);
     //NSNR - Selection Error Not Recieved
     Logger.print(", OUT, SENR:");
-    Logger.println(message);
+    Logger.println(message + "\n");
   }
 }
 
+void waitForPython(String message, int timeout) {
+  elapsedMillis timeoutTimer;
+  String buffer = "";
+  char byteBuffer[1];
+  bool timedOut = false;
+  Logger.print("TIMER, PYTHON, ");
+  Logger.print("[");
+  Logger.print(timeout);
+  Logger.print("], ");
+  Logger.println(message);
+  while (buffer.indexOf(message) == -1 && !timedOut) {
+    if (Python.available() > 0) {
+      Python.readBytes(byteBuffer, 1);
+      buffer.concat(byteBuffer[0]);
+    }
+    if (timeoutTimer > timeout || Logger.available() > 0) {
+      timedOut = true;
+    }
+  }
+  if (timedOut) {
+    Logger.print("TIMER, PYTHON, FAIL [");
+    Logger.print(timeoutTimer);
+    Logger.print("/");
+    Logger.print(timeout);
+    Logger.print("], ");
+    Logger.print(buffer);
+    Logger.println("[END]\n");
+    userInput();
+  }
+  else {
+    Logger.print("TIMER, PYTHON, PASS [");
+    Logger.print(timeoutTimer);
+    Logger.print("/");
+    Logger.print(timeout);
+    Logger.print("], ");
+    Logger.print(buffer);
+    Logger.println("[END]\n");
+  }
+}
+
+
+// Successfully sets up experiment with 2 dummy mice
+void setupExperiment() {
+  Logger.println("SETUP STARTING\n");
+  reset();
+  String mouseID[2] = {"000000000000", "111111111111"};
+  String mouseRFID[2] = {"0000000000000000", "1111111111111111"};
+  waitForPython("Arduino Ready", 15000);
+  writePython("0");
+  waitForPython("Begin Experiment", 10000);
+  writePython("2");
+  waitForPython("Num mice: 2", 2000);
+  writePython("10");
+  waitForPython("Max entries: 10", 2000);
+  for(int i = 0; i < 2; i++) {
+    writePython(mouseID[i]);
+    waitForPython(mouseID[i], 2000);
+    waitForPython(String(i), 2000);
+  }
+  waitForPython("Experiment Timer Started", 5000);
+
+  Logger.println("SETUP DONE\n");  
+}
+
+void reset() {
+  Logger.println("RESET SORTER\n");
+  digitalWrite(RESET, LOW);
+  delay(100);
+  digitalWrite(RESET, HIGH);
+}
