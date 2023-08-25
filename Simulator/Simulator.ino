@@ -2,6 +2,21 @@
   * Last modified 8/24/23
   * Simulates IR sensors and Serial communication
   * When updating Sorter code, ensure PINS 0,1, and reset are unplugged
+
+  * USER INPUT KEY
+
+  * Send RFID data - A[1/2/3]:[Data]
+  * Check active antenna: QA
+  * Send Python data - P:[Data]
+  * Set IR sensor - IR[1/2/3][L(low)/H(high)]
+  * Check active IR states: QIR
+  * Setup new experiment: SETUP
+  *     Follow prompts
+  * Start session for a given mouse: ENTER
+  *     Follow prompts and note that mouse to enter has range 0:(numMice-1)
+  * Reset Sorter - RESET
+  * End user mode - QUIT
+
 **/
 
 #include <SoftwareSerial.h>
@@ -130,14 +145,6 @@ void userInput() {
         }
         Logger.println("Pin " + String(irSensor) + ": " + String(state));
         digitalWrite(irSensor, state);
-      } else if (input.startsWith("WM:")) {
-        messageToWait = input.substring(3, input.length());
-        Logger.println("Will wait for:" + messageToWait);
-      } else if (input.startsWith("WT:")) {
-        waitTime = input.substring(3, input.length()).toInt();
-        Logger.print("Will wait for: ");
-        Logger.print(String(waitTime));
-        Logger.println(" ms");
       } else if (input == "SETUP") {
         Logger.println("PREPPING SETUP:");
         Logger.print("Num mice: ");
@@ -169,7 +176,7 @@ void userInput() {
         Logger.println("IR2: " + String(digitalRead(IR2)));
         Logger.println("IR3: " + String(digitalRead(IR3)));
       } else if (input == "QUIT") {
-        Logger.println("End User Input");
+        Logger.println("END USER INPUT");
         return;
       }
     }
