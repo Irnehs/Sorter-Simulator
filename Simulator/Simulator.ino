@@ -54,6 +54,15 @@ enum Antenna { NoAntenna,
 
 String messageToWait = "";
 int waitTime = 1000;
+
+// Experimental variables
+int numMice = 0;
+
+// Mouse variables
+int mouse = 0;
+String mouseID[4] = { "000000000000", "111111111111", "222222222222", "333333333333" };
+String mouseRFID[4] = { "0000000000000000", "1111111111111111", "2222222222222222", "3333333333333333" };
+
 // Setup
 void setup() {
 
@@ -119,8 +128,7 @@ void userInput() {
             break;
           case 3:
             antenna = Antenna3;
-          default:
-            antenna = AntennaErr;
+            break;
         }
         writeRFID(input.substring(3, input.length()), antenna);
       } else if (input.startsWith("IR")) {
@@ -149,19 +157,15 @@ void userInput() {
         Logger.println("PREPPING SETUP:");
         Logger.print("Num mice: ");
         while(Logger.available() == 0) {}
-        int numMice = Logger.readString().toInt();
-        Logger.println(numMice);
+        int desiredNumMice = Logger.readString().toInt();
+        Logger.println(desiredNumMice);
         Logger.print("Entries: ");
         while(Logger.available() == 0) {}
         int entries = Logger.readString().toInt();
         Logger.println(entries);
-        setupExperiment(numMice, entries);
+        setupExperiment(desiredNumMice, entries);
       } else if (input == "ENTER") {
         Logger.println("PREPPING ENTRY");
-        Logger.print("Num mice: ");
-        while(Logger.available() == 0) {}
-        int numMice = Logger.readString().toInt();
-        Logger.println(String(numMice));
         Logger.print("Mouse to enter: ");
         while(Logger.available() == 0) {}
         int entering = Logger.readString().toInt();
@@ -178,6 +182,26 @@ void userInput() {
       } else if (input == "QUIT") {
         Logger.println("END USER INPUT");
         return;
+      } else if (input == "MIN") {
+        Logger.println("Min Time Check");
+        MinTimeCheck(1000);
+      } else if (input == "MAX") {
+        Logger.println("Max Time Check");
+        MaxTimeCheck(1000);
+      } else if (input == "EXIT") {
+        Logger.println("Starting Exit");
+        Logger.println("Mouse to exit: ");
+        while(Logger.available() == 0) {}
+        int activeMouse = Logger.readString().toInt();
+        Logger.println(activeMouse);
+        mouseExit(activeMouse);
+      } else if (input == "YOLO") {
+        setupExperiment(3,10);
+        startSession(3,0);
+        MinTimeCheck(1000);
+        MaxTimeCheck(1000);
+        mouseExit(mouse);
+        
       }
     }
   }
@@ -325,14 +349,52 @@ void waitForPython(String message, int timeout = 3000) {
   }
 }
 
+void waitForRFID(String message, int timeout = 3000) {
+  elapsedMillis timeoutTimer;
+  String buffer = "";
+  char byteBuffer[1];
+  bool timedOut = false;
+  Logger.print("TIMER, RFID, ");
+  Logger.print("[");
+  Logger.print(timeout);
+  Logger.print("], ");
+  Logger.println(message);
+  while (buffer.indexOf(message) == -1 && !timedOut) {
+    if (RFID.available() > 0) {
+      RFID.readBytes(byteBuffer, 1);
+      buffer.concat(byteBuffer[0]);
+    }
+    if (timeoutTimer > timeout || Logger.available() > 0) {
+      timedOut = true;
+    }
+  }
+  if (timedOut) {
+    Logger.print("TIMER, RFID, FAIL [");
+    Logger.print(timeoutTimer);
+    Logger.print("/");
+    Logger.print(timeout);
+    Logger.print("], ");
+    Logger.print(buffer);
+    Logger.println("[END]\n");
+    userInput();
+  } else {
+    Logger.print("TIMER, RFID, PASS [");
+    Logger.print(timeoutTimer);
+    Logger.print("/");
+    Logger.print(timeout);
+    Logger.print("], ");
+    Logger.print(buffer);
+    Logger.println("[END]\n");
+  }
+}
+
 
 // Successfully sets up experiment with 2 dummy mice
-void setupExperiment(int numMice, int entries) {
+void setupExperiment(int mice, int entries) {
+  numMice = mice;
   Python.readString();
   Logger.println("SETUP STARTING\n");
   reset();
-  String mouseID[4] = { "000000000000", "111111111111", "222222222222", "333333333333" };
-  String mouseRFID[4] = { "0000000000000000", "1111111111111111", "2222222222222222", "3333333333333333" };
   waitForPython("Arduino Ready", 15000);
   writePython("0");
   waitForPython("Begin Experiment", 15000);
@@ -357,11 +419,10 @@ void reset() {
   digitalWrite(RESET, HIGH);
 }
 
-void startSession(int numMice, int mouse) {
+void startSession(int numMice, int selectedMouse) {
+  mouse = selectedMouse;
   Logger.println("STARTING ENTRY\n");
-  String mouseID[4] = { "000000000000", "111111111111", "222222222222", "333333333333" };
-  String mouseRFID[4] = { "0000000000000000", "1111111111111111", "2222222222222222", "3333333333333333" };
-  writeRFID(mouseRFID[0], Antenna1);
+  writeRFID(mouseRFID[mouse], Antenna1);
   waitForPython("Check Exp Time");
   writePython("1");
   waitForPython("Update Timeout");
@@ -385,3 +446,61 @@ void startSession(int numMice, int mouse) {
   waitForPython("StartMED:");
   Logger.println("SESSION STARTED FOR MOUSE " + String(mouse) + "\n");
 }
+
+void MinTimeCheck(int time) {
+  writePython("0");
+  waitForPython("Mintimechck");
+  delay(time);
+  writePython("0");
+  waitForPython("Min Time Reached");
+}
+
+void MaxTimeCheck(int time) {
+  waitForPython("Maxtimechck",10000);
+  writePython("0");
+  waitForPython("Max Time Reached");
+}
+
+void mouseExit(int activeMouse) {
+  mouse = activeMouse;
+  String mouseID[4] = { "000000000000", "111111111111", "222222222222", "333333333333" };
+  String mouseRFID[4] = { "0000000000000000", "1111111111111111", "2222222222222222", "3333333333333333" };
+  digitalWrite(IR3, LOW);
+  waitForRFID("SRA",15000);
+  writeRFID(mouseRFID[mouse], Antenna2);
+  waitForPython("Copy Data");
+  digitalWrite(IR3, HIGH);
+  waitForPython("G1 Open", 10000);
+  writeRFID(mouseRFID[mouse], Antenna1);
+  writePython("0");
+  waitForPython("Restart Cycle");
+}
+
+/** 1 - continue
+    else - expire
+**/
+void CheckExpTime(int expired) {
+  if(expired == 1) {
+    writePython("1");
+    waitForPython("Update Timeout");
+  }
+  else {
+    writePython("0");
+    waitForPython("Experiment Terminated");
+  }
+}
+
+//hello
+void UpdateTimeout(String timeoutVal) {
+  writePython(timeoutVal);
+  if(timeoutVal.substring(mouse, mouse + 1) = "1") {
+    waitForPython("G1 Open");    
+  }
+  else {
+    waitForPython("attempted to enter");
+  }
+}
+
+// 0 - correct RFID read
+// 1 - alternate RFID read
+// 2 - no RFID read
