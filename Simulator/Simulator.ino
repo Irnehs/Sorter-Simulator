@@ -108,6 +108,7 @@ void loop() {
 
 void userInput() {
   Logger.println("\nSTART USER INPUT\n");
+  
   while (1) {
 
     if (Python.available() > 0) {
@@ -211,7 +212,7 @@ void userInput() {
       } else if (input == "LONGTIME") {
         int i = 0;
         setupExperiment(4, 10000);
-        while(Logger.available() == 0) {
+        while(1) {
           startSession(4,i);
           MinTimeCheck(30000);
           MaxTimeCheck(30000);
@@ -348,8 +349,13 @@ void waitForPython(String message, int timeout = 3000) {
       Python.readBytes(byteBuffer, 1);
       buffer.concat(byteBuffer[0]);
     }
-    if (timeoutTimer > timeout || Logger.available() > 0) {
+    if (timeoutTimer > timeout) {
       timedOut = true;
+    }
+    if (Logger.available() > 0) {
+      if(Logger.readString().indexOf("EXIT") != -1) {
+        timedOut = true;
+      }
     }
   }
   if (timedOut) {
@@ -360,6 +366,14 @@ void waitForPython(String message, int timeout = 3000) {
     Logger.print("], ");
     Logger.print(buffer);
     Logger.println("[END]\n");
+    bool exit = false;
+    while(!exit) {
+      if(Logger.available() > 0) {
+        if(Logger.readString() == "USER") {
+          exit = true;
+        }
+      }
+    }
     userInput();
   } else {
     Logger.print("TIMER, PYTHON, PASS [");
@@ -399,6 +413,14 @@ void waitForRFID(String message, int timeout = 3000) {
     Logger.print("], ");
     Logger.print(buffer);
     Logger.println("[END]\n");
+    bool exit = false;
+    while(!exit) {
+      if(Logger.available() > 0) {
+        if(Logger.readString() == "USER") {
+          exit = true;
+        }
+      }
+    }
     userInput();
   } else {
     Logger.print("TIMER, RFID, PASS [");
@@ -583,6 +605,14 @@ void assertGate(Gate gate, unsigned long position, int timeout) {
     Logger.print("], ");
     Logger.print(pulseIn(gate, HIGH, 50000));
     Logger.println();
+    bool exit = false;
+    while(!exit) {
+      if(Logger.available() > 0) {
+        if(Logger.readString() == "USER") {
+          exit = true;
+        }
+      }
+    }
     userInput();
   } else {
     Logger.print("TIMER, SERVO");
