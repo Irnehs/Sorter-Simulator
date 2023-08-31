@@ -36,9 +36,12 @@
 #define Relay3 10
 
 // Gate inputs and constants
-enum Gate {Gate1 = 5, Gate2 = 6};
-#define GateOpen 1330
-#define GateClosed 1625
+enum Gate { Gate1 = 5,
+            Gate2 = 6 };
+
+// Sorter 2
+#define GateOpen 1250
+#define GateClosed 1550
 
 // Serial communications
 // Make sure both Arduinos share a common ground, and that the USB on Sorter is never
@@ -103,12 +106,25 @@ void setup() {
 }
 
 void loop() {
-  userInput();
+  // userInput();
+  int i = 0;
+  setupExperiment(4, 10000);
+  while (1) {
+    Logger.print("i =");
+    Logger.println(i);
+    startSession(4, i);
+    MinTimeCheck(30000);
+    MaxTimeCheck(30000);
+    mouseExit(mouse);
+    i++;
+    i %= 4;
+  }
+  Logger.println("All done");
 }
 
 void userInput() {
   Logger.println("\nSTART USER INPUT\n");
-  
+
   while (1) {
 
     if (Python.available() > 0) {
@@ -162,18 +178,18 @@ void userInput() {
       } else if (input == "SETUP") {
         Logger.println("PREPPING SETUP:");
         Logger.print("Num mice: ");
-        while(Logger.available() == 0) {}
+        while (Logger.available() == 0) {}
         int desiredNumMice = Logger.readString().toInt();
         Logger.println(desiredNumMice);
         Logger.print("Entries: ");
-        while(Logger.available() == 0) {}
+        while (Logger.available() == 0) {}
         int entries = Logger.readString().toInt();
         Logger.println(entries);
         setupExperiment(desiredNumMice, entries);
       } else if (input == "ENTER") {
         Logger.println("PREPPING ENTRY");
         Logger.print("Mouse to enter: ");
-        while(Logger.available() == 0) {}
+        while (Logger.available() == 0) {}
         int entering = Logger.readString().toInt();
         Logger.println(entering);
         startSession(numMice, entering);
@@ -197,13 +213,13 @@ void userInput() {
       } else if (input == "EXIT") {
         Logger.println("Starting Exit");
         Logger.println("Mouse to exit: ");
-        while(Logger.available() == 0) {}
+        while (Logger.available() == 0) {}
         int activeMouse = Logger.readString().toInt();
         Logger.println(activeMouse);
         mouseExit(activeMouse);
       } else if (input == "YOLO") {
-        setupExperiment(3,10);
-        startSession(3,0);
+        setupExperiment(3, 10);
+        startSession(3, 0);
         delay(20000);
         MinTimeCheck(1000);
         delay(20000);
@@ -212,13 +228,13 @@ void userInput() {
       } else if (input == "LONGTIME") {
         int i = 0;
         setupExperiment(4, 10000);
-        while(1) {
-          startSession(4,i);
+        while (1) {
+          startSession(4, i);
           MinTimeCheck(30000);
           MaxTimeCheck(30000);
           mouseExit(mouse);
           i++;
-          i%=4;        
+          i %= 4;
         }
       } else if (input == "QG") {
         Logger.print("G1: ");
@@ -259,12 +275,6 @@ int activeAntenna() {
  *
  * By using read/write Python and read/write RFID functions, all information communicated
  * via serial is written to computer attached to simulator by USB (AKA Logger)
- * 
- * Remaining challenges:
- * How do we make sure that Python responds in a timely manner? Polling could work, but might
- * be a bit slow. Maybe can use interrupt to detect when Python.available() flag is set?
-
-
 */
 String readPython() {
   String message = Python.readString();
@@ -353,7 +363,7 @@ void waitForPython(String message, int timeout = 3000) {
       timedOut = true;
     }
     if (Logger.available() > 0) {
-      if(Logger.readString().indexOf("EXIT") != -1) {
+      if (Logger.readString().indexOf("EXIT") != -1) {
         timedOut = true;
       }
     }
@@ -367,9 +377,9 @@ void waitForPython(String message, int timeout = 3000) {
     Logger.print(buffer);
     Logger.println("[END]\n");
     bool exit = false;
-    while(!exit) {
-      if(Logger.available() > 0) {
-        if(Logger.readString() == "USER") {
+    while (!exit) {
+      if (Logger.available() > 0) {
+        if (Logger.readString() == "USER") {
           exit = true;
         }
       }
@@ -414,9 +424,9 @@ void waitForRFID(String message, int timeout = 3000) {
     Logger.print(buffer);
     Logger.println("[END]\n");
     bool exit = false;
-    while(!exit) {
-      if(Logger.available() > 0) {
-        if(Logger.readString() == "USER") {
+    while (!exit) {
+      if (Logger.available() > 0) {
+        if (Logger.readString() == "USER") {
           exit = true;
         }
       }
@@ -444,21 +454,19 @@ void setupExperiment(int mice, int entries) {
   writePython("0");
   waitForPython("Begin Experiment", 15000);
   writePython(String(numMice));
-  waitForPython("Num mice: " + String(numMice), 2000);
+  delay(1000);
   writePython(String(entries));
-  waitForPython("Max entries: " + String(entries), 2000);
+  delay(5000);
   for (int i = 0; i < numMice; i++) {
     writePython(mouseID[i]);
-    waitForPython(mouseID[i], 2000);
-    waitForPython(String(i), 2000);
+    waitForPython(mouseID[i], 3000);
   }
   waitForPython("Experiment Timer Started", 5000);
 
-  assertGate(Gate1, GateClosed, 1000);
-  assertGate(Gate2, GateClosed, 1000);
+  assertGate(Gate1, GateClosed, 5000);
+  assertGate(Gate2, GateClosed, 5000);
 
   Logger.println("SETUP DONE FOR " + String(numMice) + " MICE\n");
-  
 }
 
 void reset() {
@@ -478,7 +486,7 @@ void startSession(int numMice, int selectedMouse) {
   writePython("1");
   waitForPython("Update Timeout");
   String timeoutString = "";
-  for(int i = 0; i < numMice; i++) {
+  for (int i = 0; i < numMice; i++) {
     timeoutString = timeoutString + "1";
   }
   writePython(timeoutString);
@@ -523,7 +531,7 @@ void MaxTimeCheck(int time) {
   delay(time);
   assertGate(Gate1, GateClosed, 500);
   assertGate(Gate2, GateClosed, 500);
-  waitForPython("Maxtimechck",10000);
+  waitForPython("Maxtimechck", 10000);
   writePython("0");
   waitForPython("Max Time Reached");
   assertGate(Gate1, GateClosed, 500);
@@ -559,11 +567,10 @@ void mouseExit(int activeMouse) {
     else - expire
 **/
 void CheckExpTime(int expired) {
-  if(expired == 1) {
+  if (expired == 1) {
     writePython("1");
     waitForPython("Update Timeout");
-  }
-  else {
+  } else {
     writePython("0");
     waitForPython("Experiment Terminated");
   }
@@ -572,10 +579,9 @@ void CheckExpTime(int expired) {
 
 void UpdateTimeout(String timeoutVal) {
   writePython(timeoutVal);
-  if(timeoutVal.substring(mouse, mouse + 1) = "1") {
-    waitForPython("G1 Open");    
-  }
-  else {
+  if (timeoutVal.substring(mouse, mouse + 1) = "1") {
+    waitForPython("G1 Open");
+  } else {
     waitForPython("attempted to enter");
   }
 }
@@ -585,19 +591,18 @@ void assertGate(Gate gate, unsigned long position, int timeout) {
   bool timedOut = false;
   elapsedMillis timeoutTimer;
 
-  
-  while(!gateAtPosition && !timedOut) {
-    if(abs(long(position - pulseIn(gate, HIGH, 50000))) < 20) {
+
+  while (!gateAtPosition && !timedOut) {
+    if (abs(long(position - pulseIn(gate, HIGH, 50000))) < 20) {
       gateAtPosition = true;
-    }
-    else if (timeoutTimer > timeout) {
-      timedOut = true;      
+    } else if (timeoutTimer > timeout) {
+      timedOut = true;
     }
   }
 
   if (timedOut) {
     Logger.print("TIMER, SERVO");
-    Logger.print(gate-4);
+    Logger.print(gate - 4);
     Logger.print(", FAIL [");
     Logger.print(timeoutTimer);
     Logger.print("/");
@@ -606,9 +611,9 @@ void assertGate(Gate gate, unsigned long position, int timeout) {
     Logger.print(pulseIn(gate, HIGH, 50000));
     Logger.println();
     bool exit = false;
-    while(!exit) {
-      if(Logger.available() > 0) {
-        if(Logger.readString() == "USER") {
+    while (!exit) {
+      if (Logger.available() > 0) {
+        if (Logger.readString() == "USER") {
           exit = true;
         }
       }
@@ -616,7 +621,7 @@ void assertGate(Gate gate, unsigned long position, int timeout) {
     userInput();
   } else {
     Logger.print("TIMER, SERVO");
-    Logger.print(gate-4);
+    Logger.print(gate - 4);
     Logger.print(", PASS [");
     Logger.print(timeoutTimer);
     Logger.print("/");
