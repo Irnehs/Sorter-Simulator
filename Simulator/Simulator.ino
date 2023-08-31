@@ -35,6 +35,11 @@
 #define Relay2 9
 #define Relay3 10
 
+// Gate inputs and constants
+enum Gate {Gate1 = 5, Gate2 = 6};
+#define GateOpen 1330
+#define GateClosed 1625
+
 // Serial communications
 // Make sure both Arduinos share a common ground, and that the USB on Sorter is never
 // plugged in at the same time as Pins 0/1
@@ -56,7 +61,7 @@ String messageToWait = "";
 int waitTime = 1000;
 
 // Experimental variables
-int numMice = 0;
+int numMice = 4;
 
 // Mouse variables
 int mouse = 0;
@@ -198,10 +203,28 @@ void userInput() {
       } else if (input == "YOLO") {
         setupExperiment(3,10);
         startSession(3,0);
+        delay(20000);
         MinTimeCheck(1000);
+        delay(20000);
         MaxTimeCheck(1000);
         mouseExit(mouse);
-        
+      } else if (input == "LONGTIME") {
+        int i = 0;
+        setupExperiment(4, 10000);
+        while(Logger.available() == 0) {
+          startSession(4,i);
+          MinTimeCheck(30000);
+          MaxTimeCheck(30000);
+          mouseExit(mouse);
+          i++;
+          i%=4;        
+        }
+      } else if (input == "QG") {
+        Logger.print("G1: ");
+        Logger.println(pulseIn(Gate1, HIGH, 100000));
+        Logger.print("G2: ");
+        Logger.println(pulseIn(Gate2, HIGH, 100000));
+        Logger.println();
       }
     }
   }
@@ -409,7 +432,11 @@ void setupExperiment(int mice, int entries) {
   }
   waitForPython("Experiment Timer Started", 5000);
 
+  assertGate(Gate1, GateClosed, 1000);
+  assertGate(Gate2, GateClosed, 1000);
+
   Logger.println("SETUP DONE FOR " + String(numMice) + " MICE\n");
+  
 }
 
 void reset() {
@@ -422,6 +449,8 @@ void reset() {
 void startSession(int numMice, int selectedMouse) {
   mouse = selectedMouse;
   Logger.println("STARTING ENTRY\n");
+  assertGate(Gate1, GateClosed, 500);
+  assertGate(Gate2, GateClosed, 500);
   writeRFID(mouseRFID[mouse], Antenna1);
   waitForPython("Check Exp Time");
   writePython("1");
@@ -431,34 +460,53 @@ void startSession(int numMice, int selectedMouse) {
     timeoutString = timeoutString + "1";
   }
   writePython(timeoutString);
-  waitForPython("1");
-  waitForPython("1");
   waitForPython("G1 Open");
   writeRFID(mouseRFID[mouse], Antenna2);
+  assertGate(Gate1, GateOpen, 500);
+  assertGate(Gate2, GateClosed, 500);
   digitalWrite(IR3, LOW);
   waitForPython("G1 close", 5000);
   waitForPython("Mouse in tube");
   writeRFID(mouseRFID[mouse], Antenna2);
   waitForPython("Only 1 Mouse");
   waitForPython("G2 Open");
+  assertGate(Gate1, GateClosed, 500);
+  assertGate(Gate2, GateOpen, 2000);
   writeRFID(mouseRFID[mouse], Antenna3);
   digitalWrite(IR3, HIGH);
   waitForPython("StartMED:");
+  assertGate(Gate1, GateClosed, 500);
+  assertGate(Gate2, GateClosed, 500);
   Logger.println("SESSION STARTED FOR MOUSE " + String(mouse) + "\n");
 }
 
 void MinTimeCheck(int time) {
+  assertGate(Gate1, GateClosed, 500);
+  assertGate(Gate2, GateClosed, 500);
   writePython("0");
   waitForPython("Mintimechck");
   delay(time);
+  assertGate(Gate1, GateClosed, 500);
+  assertGate(Gate2, GateClosed, 500);
   writePython("0");
   waitForPython("Min Time Reached");
+  assertGate(Gate1, GateClosed, 500);
+  assertGate(Gate2, GateClosed, 500);
+  Logger.println("MIN TIME CHECK DONE");
 }
 
 void MaxTimeCheck(int time) {
+  assertGate(Gate1, GateClosed, 500);
+  assertGate(Gate2, GateClosed, 500);
+  delay(time);
+  assertGate(Gate1, GateClosed, 500);
+  assertGate(Gate2, GateClosed, 500);
   waitForPython("Maxtimechck",10000);
   writePython("0");
   waitForPython("Max Time Reached");
+  assertGate(Gate1, GateClosed, 500);
+  assertGate(Gate2, GateOpen, 500);
+  Logger.println("MAX TIME CHECK DONE");
 }
 
 void mouseExit(int activeMouse) {
@@ -466,14 +514,23 @@ void mouseExit(int activeMouse) {
   String mouseID[4] = { "000000000000", "111111111111", "222222222222", "333333333333" };
   String mouseRFID[4] = { "0000000000000000", "1111111111111111", "2222222222222222", "3333333333333333" };
   digitalWrite(IR3, LOW);
-  waitForRFID("SRA",15000);
+  assertGate(Gate1, GateClosed, 500);
+  assertGate(Gate2, GateOpen, 500);
   writeRFID(mouseRFID[mouse], Antenna2);
+  waitForPython("G2 close");
+  assertGate(Gate1, GateClosed, 500);
+  assertGate(Gate2, GateClosed, 500);
   waitForPython("Copy Data");
   digitalWrite(IR3, HIGH);
   waitForPython("G1 Open", 10000);
+  assertGate(Gate1, GateOpen, 500);
+  assertGate(Gate2, GateClosed, 500);
   writeRFID(mouseRFID[mouse], Antenna1);
-  writePython("0");
+  waitForPython("Session Finished");
+  writePython("111");
   waitForPython("Restart Cycle");
+  assertGate(Gate1, GateClosed, 500);
+  assertGate(Gate2, GateClosed, 500);
 }
 
 /** 1 - continue
@@ -490,7 +547,7 @@ void CheckExpTime(int expired) {
   }
 }
 
-//hello
+
 void UpdateTimeout(String timeoutVal) {
   writePython(timeoutVal);
   if(timeoutVal.substring(mouse, mouse + 1) = "1") {
@@ -501,6 +558,41 @@ void UpdateTimeout(String timeoutVal) {
   }
 }
 
-// 0 - correct RFID read
-// 1 - alternate RFID read
-// 2 - no RFID read
+void assertGate(Gate gate, unsigned long position, int timeout) {
+  bool gateAtPosition = false;
+  bool timedOut = false;
+  elapsedMillis timeoutTimer;
+
+  
+  while(!gateAtPosition && !timedOut) {
+    if(abs(long(position - pulseIn(gate, HIGH, 50000))) < 20) {
+      gateAtPosition = true;
+    }
+    else if (timeoutTimer > timeout) {
+      timedOut = true;      
+    }
+  }
+
+  if (timedOut) {
+    Logger.print("TIMER, SERVO");
+    Logger.print(gate-4);
+    Logger.print(", FAIL [");
+    Logger.print(timeoutTimer);
+    Logger.print("/");
+    Logger.print(timeout);
+    Logger.print("], ");
+    Logger.print(pulseIn(gate, HIGH, 50000));
+    Logger.println();
+    userInput();
+  } else {
+    Logger.print("TIMER, SERVO");
+    Logger.print(gate-4);
+    Logger.print(", PASS [");
+    Logger.print(timeoutTimer);
+    Logger.print("/");
+    Logger.print(timeout);
+    Logger.print("], ");
+    Logger.print(pulseIn(gate, HIGH, 50000));
+    Logger.println();
+  }
+}

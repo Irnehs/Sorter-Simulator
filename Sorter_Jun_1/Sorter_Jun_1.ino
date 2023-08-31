@@ -392,7 +392,7 @@ void loop()
             if (Zone2Cont)
             {
 
-              // AllowEntry:  //This is a goto point when M @ A2 is not read, but there is a mouse in the center tube
+AllowEntry:  //This is a goto point when M @ A2 is not read, but there is a mouse in the center tube
 
               // Turn on Antenna 3
               digitalWrite(Relay3pin, HIGH);
