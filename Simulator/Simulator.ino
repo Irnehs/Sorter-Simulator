@@ -18,6 +18,14 @@
   * End user mode - QUIT
 
 **/
+unsigned long timestamp;
+#define MS_PER_HR 1000 * 60 * 60
+#define MS_PER_MIN 10000 * 60
+#define MS_PER_S 1000
+unsigned long hour;
+unsigned long min;
+unsigned long sec;
+unsigned long msec;
 
 #include <SoftwareSerial.h>
 #include <elapsedMillis.h>
@@ -285,6 +293,7 @@ String readPython() {
 }
 
 void writePython(String message) {
+  TimeStamp();
   Python.print(message);
   Logger.print("PYTHON, OUT, ");
   Logger.print(message);
@@ -320,6 +329,7 @@ String readRFID() {
 }
 
 void writeRFID(String message, Antenna antenna) {
+  TimeStamp();
   int active = activeAntenna();
   if (active == antenna) {
     RFID.print(message);
@@ -349,6 +359,7 @@ void waitForPython(String message, int timeout = 3000) {
   String buffer = "";
   char byteBuffer[1];
   bool timedOut = false;
+  TimeStamp();
   Logger.print("TIMER, PYTHON, ");
   Logger.print("[");
   Logger.print(timeout);
@@ -369,6 +380,7 @@ void waitForPython(String message, int timeout = 3000) {
     }
   }
   if (timedOut) {
+    TimeStamp();
     Logger.print("TIMER, PYTHON, FAIL [");
     Logger.print(timeoutTimer);
     Logger.print("/");
@@ -386,6 +398,7 @@ void waitForPython(String message, int timeout = 3000) {
     }
     userInput();
   } else {
+    TimeStamp();
     Logger.print("TIMER, PYTHON, PASS [");
     Logger.print(timeoutTimer);
     Logger.print("/");
@@ -416,6 +429,7 @@ void waitForRFID(String message, int timeout = 3000) {
     }
   }
   if (timedOut) {
+    TimeStamp();
     Logger.print("TIMER, RFID, FAIL [");
     Logger.print(timeoutTimer);
     Logger.print("/");
@@ -433,6 +447,7 @@ void waitForRFID(String message, int timeout = 3000) {
     }
     userInput();
   } else {
+    TimeStamp();
     Logger.print("TIMER, RFID, PASS [");
     Logger.print(timeoutTimer);
     Logger.print("/");
@@ -466,10 +481,12 @@ void setupExperiment(int mice, int entries) {
   assertGate(Gate1, GateClosed, 5000);
   assertGate(Gate2, GateClosed, 5000);
 
+  TimeStamp();
   Logger.println("SETUP DONE FOR " + String(numMice) + " MICE\n");
 }
 
 void reset() {
+  TimeStamp();
   Logger.println("RESET SORTER\n");
   digitalWrite(RESET, LOW);
   delay(100);
@@ -478,6 +495,7 @@ void reset() {
 
 void startSession(int numMice, int selectedMouse) {
   mouse = selectedMouse;
+  TimeStamp();
   Logger.println("STARTING ENTRY\n");
   assertGate(Gate1, GateClosed, 500);
   assertGate(Gate2, GateClosed, 500);
@@ -507,6 +525,7 @@ void startSession(int numMice, int selectedMouse) {
   waitForPython("StartMED:");
   assertGate(Gate1, GateClosed, 500);
   assertGate(Gate2, GateClosed, 500);
+  TimeStamp();
   Logger.println("SESSION STARTED FOR MOUSE " + String(mouse) + "\n");
 }
 
@@ -522,6 +541,7 @@ void MinTimeCheck(int time) {
   waitForPython("Min Time Reached");
   assertGate(Gate1, GateClosed, 500);
   assertGate(Gate2, GateClosed, 500);
+  TimeStamp();
   Logger.println("MIN TIME CHECK DONE");
 }
 
@@ -536,6 +556,7 @@ void MaxTimeCheck(int time) {
   waitForPython("Max Time Reached");
   assertGate(Gate1, GateClosed, 500);
   assertGate(Gate2, GateOpen, 500);
+  TimeStamp();
   Logger.println("MAX TIME CHECK DONE");
 }
 
@@ -589,11 +610,20 @@ void UpdateTimeout(String timeoutVal) {
 void assertGate(Gate gate, unsigned long position, int timeout) {
   bool gateAtPosition = false;
   bool timedOut = false;
+  unsigned long input;
   elapsedMillis timeoutTimer;
 
+  TimeStamp();
+  Logger.print("TIMER, SERVO");
+  Logger.print(gate - 4);
+  Logger.print(", [");
+  Logger.print(timeout);
+  Logger.print("], ");
+  Logger.println(position);
 
   while (!gateAtPosition && !timedOut) {
-    if (abs(long(position - pulseIn(gate, HIGH, 50000))) < 20) {
+    input = pulseIn(gate, HIGH, 50000);
+    if (abs(long(position - input)) < 20) {
       gateAtPosition = true;
     } else if (timeoutTimer > timeout) {
       timedOut = true;
@@ -601,6 +631,7 @@ void assertGate(Gate gate, unsigned long position, int timeout) {
   }
 
   if (timedOut) {
+    TimeStamp();
     Logger.print("TIMER, SERVO");
     Logger.print(gate - 4);
     Logger.print(", FAIL [");
@@ -608,7 +639,7 @@ void assertGate(Gate gate, unsigned long position, int timeout) {
     Logger.print("/");
     Logger.print(timeout);
     Logger.print("], ");
-    Logger.print(pulseIn(gate, HIGH, 50000));
+    Logger.print(input);
     Logger.println();
     bool exit = false;
     while (!exit) {
@@ -620,6 +651,7 @@ void assertGate(Gate gate, unsigned long position, int timeout) {
     }
     userInput();
   } else {
+    TimeStamp();
     Logger.print("TIMER, SERVO");
     Logger.print(gate - 4);
     Logger.print(", PASS [");
@@ -630,4 +662,17 @@ void assertGate(Gate gate, unsigned long position, int timeout) {
     Logger.print(pulseIn(gate, HIGH, 50000));
     Logger.println();
   }
+}
+
+void TimeStamp() {
+  unsigned long runMillis = millis();
+  unsigned long allSeconds = millis() / 1000;
+  int runHours = allSeconds / 3600;
+  int secsRemaining = allSeconds % 3600;
+  int runMinutes = secsRemaining / 60;
+  int runSeconds = secsRemaining % 60;
+
+  char buf[20];
+  sprintf(buf, "[%02d:%02d:%02d]", runHours, runMinutes, runSeconds);
+  Serial.print(buf);
 }

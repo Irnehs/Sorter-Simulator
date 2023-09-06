@@ -84,6 +84,8 @@ bool MouseInCenter = true;
 //The variable that receives python command to continue executing
 String readstring = "";  //RENAME
 
+// Variables for situations with multiple mice in chamber
+int miceInChamber = 0;
 
 
 void setup() {
@@ -383,9 +385,9 @@ AllowEntry:  //This is a goto point when M @ A2 is not read, but there is a mous
               while (Serial1.available() == 0) {}
               /////////////ADD some code here to store the ID value and check zone 3 = zone 2 to final check
               // Fixed error: Gate would automatically trigger at line 466 since Serial1 was never cleared
-              Serial1.readString()
-                //Close gate 2 slowly
-                while (gateCounter < steps) {
+              Serial1.readString();
+              //Close gate 2 slowly
+              while (gateCounter < steps) {
                 sensorState2 = digitalRead(IRSENSOR2pin);
                 if (sensorState2 == HIGH) {
                   gate2.writeMicroseconds(gateOpen - (gateCounter + 1) * degreePerStep);
@@ -448,6 +450,8 @@ AllowEntry:  //This is a goto point when M @ A2 is not read, but there is a mous
                 }
               }
 
+              // Mark that one mouse has entered
+              miceInChamber++;
 
 
               //Turn off Antenna 3
@@ -456,27 +460,64 @@ AllowEntry:  //This is a goto point when M @ A2 is not read, but there is a mous
 
               entries[check] = entries[check] + 1;
 
+              mouseZone3 = mouseZone2;
+
               //Send signal to Python to Start Med PC session
               //readstring = "StartMED:";
               Serial.print("M:");
               Serial.println(check);
               Serial.println("StartMED:");
 
+              // Start polling for Antenna 3
+
               //Waiting for Python to send signal to continue executing code below
               while (Serial.available() == 0) {}
               readstring = Serial.readString();
 
 
+              bool SecondMouseInCenter = false;
               //Minimum Time check
+
+              Serial.println("Mintimechck");
+
+              // Turn on Antenna 3 and clear any startup feedback
+              digitalWrite(Relay3pin, HIGH);
+              Serial1.readString();
+
               while (!MinTestTimeReached) {
-                ////read RFID 3 and see if another mouse is present, could be a nice to have
+                // read IR3 and allow it to exit if mouse is in center
+                if (digitalRead(IRSENSOR2pin) == LOW) {
+                  ExitFromCenter();
+                }
+                //read RFID 3 and see if another mouse is present, could be a nice to have
+                if (Serial1.available() != 0) {
+                  readstring = Serial1.readString().substring(4, 16);
+                  switch(CheckRFID(readstring, mouseZone2)) {
+                    
+                    // No valid mouse detected
+                    case 0:
+                      break;
+
+                    // Mouse that we know entered is detected
+                    case 1:
+                      break;
+                      
+                    // Mouse that should not be inside is detected
+                    case 2:
+                      ExitOpChamber(readstring);
+                      break;
+
+                  }
+                }
 
                 //Ask Python if Min time reached
-                Serial.println("Mintimechck");
-                while (Serial.available() == 0) {}
-                readstring = Serial.readString();
-                if (readstring == "0") {
-                  MinTestTimeReached = true;
+                if (Serial.available() != 0) {
+                  readstring = Serial.readString();
+                  if (readstring == "0") {
+                    MinTestTimeReached = true;
+                  } else {
+                    Serial.println("Mintimechck");
+                  }
                 }
               }
 
@@ -487,10 +528,138 @@ AllowEntry:  //This is a goto point when M @ A2 is not read, but there is a mous
               digitalWrite(Relay3pin, HIGH);
               Serial1.readString();  ///CLEAR ANY INFO ,BANDAID FIX
 
-
               //Ask Python if max test time reached
-              tORf = true;
-              while (!MaxTestTimeReached && tORf) {
+              bool exitBeforeMaxtime = false;
+              bool askPython = true;
+              int MiceInOpChamber = 1;
+
+              while (!MaxTestTimeReached && MiceInOpChamber != 0) {
+
+                if (Serial1.available() != 0) {
+                  readstring = Serial1.readString().substring(4, 16);
+                  switch(CheckRFID(readstring, mouseZone2)) {
+                    
+                    // No valid mouse detected
+                    case 0:
+                      break;
+
+                    // Mouse that we know entered is detected
+                    case 1:
+                      if(ExitOpChamber(readstring) == 1) {
+                        MiceInOpChamber = 0;
+                      }
+                      break;
+                      
+                    // Mouse that should not be inside is detected
+                    case 2:
+                      if(ExitOpChamber(readstring) == 0) {
+                        MiceInOpChamber++;
+                      }
+                      break;
+
+                  }
+                }
+
+                int ExitOpChamber(String id) {
+                  String readstring;
+                  digitalWrite(Relay1pin, LOW);
+                  digitalWrite(Relay2pin, LOW);
+                  digitalWrite(Relay3pin, LOW);
+                  digitalWrite(Relay2pin, HIGH);
+
+                  bool mouseAtA2 = false;
+                  while(!mouseAtA2) {
+                    if(Serial1.available() != 0) {
+                      switch(checkRFID(Serial1.readString().substring(4,16), id)) {
+                        // No match
+                        case 0:
+                          break;
+
+                        // Matches target
+                        case 1:
+                          // close G2
+                        
+                        // Matches another mouse
+                        case 2:
+                
+                      }
+                    }
+                  }
+                  
+                  
+                  
+                }
+
+                if (askPython) {
+                  Serial.println("Maxtimechck");
+                  askPython = false;
+                }
+
+                if (Serial.available != 0 && askPython == false) {
+                  readstring = Serial.readString();
+                  if (readstring == "0") {
+                    MaxTestTimeReached == true;
+                  } else {
+                    askPython = true;
+                  }
+                }
+
+                void ExitFromOpChamber(String id) {
+                  // Open G2
+                  gate2.writeMicroseconds(gateOpen);
+                  // Antenna 2 on
+                  digitalWrite(Relay2pin, HIGH);
+
+                  mouseInCenter = false;
+                  while (!mouseInCenter) {
+                    
+                    if (Serial1.available() != 0) {
+                      readstring = Serial1.readString().substring(4, 16);
+                      if (readstring == id) {
+                        // check if mouse in center with IR
+                        
+                        // Returns 1 if ID matches target, 2 if ID matches another mouse, 0 if no match at all
+                        
+
+                        // if mouse in center
+                        // close G2 with safety
+                        if (digitalRead(IRSENSOR2pin) == LOW) {
+                          bool rightMouseInCenter = false;
+                          while (!rightMouseInCenter) {
+                            if (Serial1.available() != 0) {
+                              readstring = Serial1.readString().substring(4, 16);
+                              for (int i = 0; i < numMice; i++) {
+                                if (IDarray[i] == readstring) {
+                                  if (IDarray[i] != id) {
+                                    // open G2 and wait for exit
+                                    digitalWrite(Relay2pin, LOW);
+                                    digitalWrite(Relay3pin, HIGH);
+                                    gate2.writeMicroseconds(gateOpen);
+                                    bool mouseReturned = false;
+                                    while (!mouseReturned) {
+                                      if (Serial1.available() != 0) {
+                                        if (Serial1.readString().substring((4, 16) == readString)) {
+                                          mouseReturned = true;
+                                        }
+                                      }
+                                    }
+                                    // close G2 with safety
+
+                                  } else {
+                                    // mouse successfully in center
+                                    ExitFromCenter();
+                                    return;
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+
                 ///////read RFID 3 and see if another mouse is present, end session could be a nice to have
                 mouseZone3 = Serial1.readString().substring(4, 16);
                 if (mouseZone3 != "") {  //********Changed bc mouse was able to move past gate
@@ -1224,7 +1393,7 @@ AllowEntry:  //This is a goto point when M @ A2 is not read, but there is a mous
         tORf = true;
         while (tORf == true) {
           Serial1.write("LTG\r");
-          while(Serial1.available() == 0) {}
+          while (Serial1.available() == 0) {}
           if (Serial1.readString() == "?1\r") {
             tORf = false;
           }
@@ -1377,3 +1546,18 @@ AllowEntry:  //This is a goto point when M @ A2 is not read, but there is a mous
     ExpTerm = false;
   }
 }
+
+// Returns 0 if no RFID match, 1 if RFID matches target, 2 if RFID matches another mouse
+int CheckRFID(int toCheck, int target) {
+                          for(int i = 0; i < numMice; i++) {
+                            if(IDarray[i] == toCheck) {
+                              if(toCheck == target) {
+                                return 1;
+                              }
+                              else {
+                                return 2;
+                              }
+                            }
+                          }
+                          return 0;                    
+                        }
