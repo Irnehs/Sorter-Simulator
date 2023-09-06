@@ -114,20 +114,20 @@ void setup() {
 }
 
 void loop() {
-  // userInput();
-  int i = 0;
-  setupExperiment(4, 10000);
-  while (1) {
-    Logger.print("i =");
-    Logger.println(i);
-    startSession(4, i);
-    MinTimeCheck(30000);
-    MaxTimeCheck(30000);
-    mouseExit(mouse);
-    i++;
-    i %= 4;
-  }
-  Logger.println("All done");
+  userInput();
+  // int i = 0;
+  // setupExperiment(4, 10000);
+  // while (1) {
+  //   Logger.print("i =");
+  //   Logger.println(i);
+  //   startSession(4, i);
+  //   MinTimeCheck(30000);
+  //   MaxTimeCheck(30000);
+  //   mouseExit(mouse);
+  //   i++;
+  //   i %= 4;
+  // }
+  // Logger.println("All done");
 }
 
 void userInput() {
@@ -285,6 +285,7 @@ int activeAntenna() {
  * via serial is written to computer attached to simulator by USB (AKA Logger)
 */
 String readPython() {
+  TimeStamp();
   String message = Python.readString();
   Logger.print("PYTHON, IN, ");
   Logger.print(message);
@@ -303,6 +304,7 @@ void writePython(String message) {
 String readRFID() {
   int active = activeAntenna();
   // int active = activeAntenna();
+  TimeStamp();
   if (active == Antenna1 || active == Antenna2 || active == Antenna3) {
     String message = RFID.readString();
     Logger.print("RFID");
@@ -573,11 +575,13 @@ void mouseExit(int activeMouse) {
   assertGate(Gate2, GateClosed, 500);
   waitForPython("Copy Data");
   digitalWrite(IR3, HIGH);
+  writeRFID(mouseRFID[mouse], Antenna2);
   waitForPython("G1 Open", 10000);
   assertGate(Gate1, GateOpen, 500);
   assertGate(Gate2, GateClosed, 500);
   writeRFID(mouseRFID[mouse], Antenna1);
-  waitForPython("Session Finished");
+  waitForPython("G1 close", 10000);
+  waitForPython("session Finished");
   writePython("111");
   waitForPython("Restart Cycle");
   assertGate(Gate1, GateClosed, 500);
