@@ -581,8 +581,8 @@ void mouseExit(int activeMouse) {
   assertGate(Gate2, GateClosed, 500);
   writeRFID(mouseRFID[mouse], Antenna1);
   waitForPython("G1 close", 10000);
-  waitForPython("session Finished");
-  writePython("111");
+  waitForPython("Session Finished");
+  writePython("1111");
   waitForPython("Restart Cycle");
   assertGate(Gate1, GateClosed, 500);
   assertGate(Gate2, GateClosed, 500);
