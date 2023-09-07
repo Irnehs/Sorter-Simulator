@@ -803,7 +803,7 @@ int ExitFromCenter() {
   gate1.writeMicroseconds(gateOpen);
 
   elapsedMillis gateTimer;
-  while (!mouseAtA1) {
+  while (!mouseAtA1 && gateTimer < 5000) {
     if (Serial1.available() != 0) {
       read = Serial1.readString().substring(4, 16);
       Serial.println(read);
