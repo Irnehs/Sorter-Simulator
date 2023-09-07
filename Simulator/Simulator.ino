@@ -114,20 +114,19 @@ void setup() {
 }
 
 void loop() {
-  userInput();
-  // int i = 0;
-  // setupExperiment(4, 10000);
-  // while (1) {
-  //   Logger.print("i =");
-  //   Logger.println(i);
-  //   startSession(4, i);
-  //   MinTimeCheck(30000);
-  //   MaxTimeCheck(30000);
-  //   mouseExit(mouse);
-  //   i++;
-  //   i %= 4;
-  // }
-  // Logger.println("All done");
+  int i = 0;
+  setupExperiment(4, 10000);
+  while (1) {
+    Logger.print("i =");
+    Logger.println(i);
+    startSession(4, i);
+    MinTimeCheck(30000);
+    MaxTimeCheck(30000);
+    mouseExit(mouse);
+    i++;
+    i %= 4;
+  }
+  Logger.println("All done");
 }
 
 void userInput() {
