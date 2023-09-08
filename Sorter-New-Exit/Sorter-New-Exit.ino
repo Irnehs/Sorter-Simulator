@@ -284,7 +284,7 @@ void loop() {
             M2eM1 = true;
           }
 
-          if (mouseZone2 != mouseZone1 && mouseZone2 != "") {  // the case where mouse that triggersgate to open turns around and another mouse enters the tube these conditions are set
+          if (mouseZone2 != mouseZone1 && MouseIsInExperiment(mouseZone2)) {  // the case where mouse that triggersgate to open turns around and another mouse enters the tube these conditions are set
             Mscanned = true;
             M2eM1 = false;
           }
@@ -349,6 +349,10 @@ AllowEntry:  //This is a goto point when M @ A2 is not read, but there is a mous
 
 
               //Turn on Antenna 3
+              digitalWrite(Relay3pin, LOW);
+              digitalWrite(Relay2pin, LOW);
+              digitalWrite(Relay1pin, LOW);
+
               digitalWrite(Relay3pin, HIGH);
 
               //Open gate 2
@@ -499,13 +503,8 @@ AllowEntry:  //This is a goto point when M @ A2 is not read, but there is a mous
                         Serial.println("Copy Data");
                         medClosed = true;
                       }
-                      CloseGate2();
-                      if (digitalRead(IRSENSOR3pin) == LOW) {
-                        ExitFromCenter();
-                      } else {
-                        gate2.writeMicroseconds(gateOpen);
-                      }
-
+                      AddToExitArray(readstring);
+                      ExitFromOpChamber(readstring);
                       break;
 
                     // Mouse that should not be inside is detected
@@ -515,12 +514,8 @@ AllowEntry:  //This is a goto point when M @ A2 is not read, but there is a mous
                         Serial.println("Copy Data");
                         medClosed = true;
                       }
-                      CloseGate2();
-                      if (digitalRead(IRSENSOR3pin) == LOW) {
-                        ExitFromCenter();
-                      } else {
-                        gate2.writeMicroseconds(gateOpen);
-                      }
+                      AddToExitArray(readstring);
+                      ExitFromOpChamber(readstring);
                       break;
                   }
                 }
@@ -724,129 +719,135 @@ bool MouseIsInExperiment(String ID) {
   return false;
 }
 void ShowMiceToExit() {
+  bool cont = true;
   Serial.println("Mice to Exit:");
   for (int i = 0; i < numMiceToExit; i++) {
     Serial.println(MiceToExitArray[i]);
   }
   Serial.println();
 }
+
 // Returns numMiceToExit
 int ExitFromCenter() {
-  digitalWrite(Relay1pin, LOW);
-  digitalWrite(Relay2pin, LOW);
-  digitalWrite(Relay3pin, LOW);
-  digitalWrite(Relay2pin, HIGH);
-  String target;
-  bool targetFound = false;
-  elapsedMillis rfidTimer;
-  while (!targetFound && rfidTimer < 10000) {
-    if (Serial1.available() != 0) {
-      target = Serial1.readString().substring(4, 16);
-      if (target != "" && MouseIsInExperiment(target)) {
-        AddToExitArray(target);
-        targetFound = true;
+
+  while (1) {
+    digitalWrite(Relay1pin, LOW);
+    digitalWrite(Relay2pin, LOW);
+    digitalWrite(Relay3pin, LOW);
+    digitalWrite(Relay2pin, HIGH);
+    String target;
+    bool targetFound = false;
+    elapsedMillis rfidTimer;
+    while (!targetFound && rfidTimer < 10000) {
+      if (Serial1.available() != 0) {
+        target = Serial1.readString().substring(4, 16);
+        if (target != "" && MouseIsInExperiment(target)) {
+          AddToExitArray(target);
+          targetFound = true;
+        }
       }
     }
-  }
 
-  if (!targetFound) {
-    Serial.println("No RFID scanned in middle");
+    if (!targetFound) {
+      Serial.println("No RFID scanned in middle");
+      return -1;
+    } else {
+      digitalWrite(Relay2pin, LOW);
+      digitalWrite(Relay1pin, HIGH);
 
-    return ExitFromCenter();
-  }
+      bool mouseAtA1 = false;
+      String read;
 
-  digitalWrite(Relay2pin, LOW);
-  digitalWrite(Relay1pin, HIGH);
+      Serial.println("G1 Open");
+      gate1.writeMicroseconds(gateOpen);
 
-  bool mouseAtA1 = false;
-  String read;
-
-  Serial.println("G1 Open");
-  gate1.writeMicroseconds(gateOpen);
-
-  elapsedMillis gateTimer;
-  while (!mouseAtA1 && gateTimer < 5000) {
-    if (Serial1.available() != 0) {
-      read = Serial1.readString().substring(4, 16);
-      Serial.println(read);
-      if (MouseIsInChamber(read)) {
-        Serial.println("Target moved to A1");
-        mouseAtA1 = true;
+      elapsedMillis gateTimer;
+      while (!mouseAtA1 && gateTimer < 5000) {
+        if (Serial1.available() != 0) {
+          read = Serial1.readString().substring(4, 16);
+          Serial.println(read);
+          if (MouseIsInChamber(read)) {
+            Serial.println("Target moved to A1");
+            mouseAtA1 = true;
+          }
+        }
+      }
+      CloseGate1();
+      digitalWrite(Relay1pin, LOW);
+      RemoveFromExitArray(target);
+      if (digitalRead(IRSENSOR3pin) == HIGH) {
+        Serial.println("Mouse is not in center");
+        ShowMiceToExit();
+        return numMiceToExit;
+      } else {
+        Serial.println("Mouse is in center");
+        ShowMiceToExit();
+        Serial.println("Unkown mice in center to exit as well");
       }
     }
-  }
-  CloseGate1();
-  digitalWrite(Relay1pin, LOW);
-  RemoveFromExitArray(target);
-  if (digitalRead(IRSENSOR3pin) == HIGH) {
-    Serial.println("Mouse is not in center");
-    ShowMiceToExit();
-    return numMiceToExit;
-  } else {
-    Serial.println("Mouse is in center");
-    ShowMiceToExit();
-    return ExitFromCenter();
   }
 }
 
 int ExitFromOpChamber(String id) {
   String readstring;
-  digitalWrite(Relay1pin, LOW);
-  digitalWrite(Relay2pin, LOW);
-  digitalWrite(Relay3pin, LOW);
-  digitalWrite(Relay2pin, HIGH);
+  while (1) {
+    digitalWrite(Relay1pin, LOW);
+    digitalWrite(Relay2pin, LOW);
+    digitalWrite(Relay3pin, LOW);
+    digitalWrite(Relay2pin, HIGH);
 
-  Serial.println("G2 Open");
-  gate2.writeMicroseconds(gateOpen);
+    Serial.println("G2 Open");
+    gate2.writeMicroseconds(gateOpen);
 
 
-  bool mouseAtA2 = false;
-  while (!mouseAtA2) {
-    if (Serial1.available() != 0) {
-      String read = Serial1.readString().substring(4, 16);
-      Serial.println(read);
-      switch (CheckRFID(read, id)) {
-        // No match
-        case 0:
-          Serial.println("Invalid RFID");
-          break;
+    bool mouseAtA2 = false;
+    while (!mouseAtA2) {
+      if (Serial1.available() != 0) {
+        String read = Serial1.readString().substring(4, 16);
+        Serial.println(read);
+        switch (CheckRFID(read, id)) {
+          // No match
+          case 0:
+            Serial.println("Invalid RFID");
+            break;
 
-        // Matches target
-        case 1:
-          Serial.println("Matches target");
-          Serial.println("CloseMED");
-          Serial.println("Copy Data");
-          CloseGate2();
-          if (digitalRead(IRSENSOR3pin) == LOW) {
-            Serial.println("Mouse in center");
-            ShowMiceToExit();
-            return ExitFromCenter();
-          } else {
-            Serial.println("Mouse not in center");
-            ShowMiceToExit();
-            gate2.writeMicroseconds(gateOpen);
-            Serial.println("G2 Open");
-            return ExitFromOpChamber(id);
-          }
-          break;
+          // Matches target
+          case 1:
+            Serial.println("Matches target");
+            Serial.println("CloseMED");
+            Serial.println("Copy Data");
+            CloseGate2();
+            if (digitalRead(IRSENSOR3pin) == LOW) {
+              Serial.println("Mouse in center");
+              ShowMiceToExit();
+              return ExitFromCenter();
+            } else {
+              Serial.println("Mouse not in center");
+              ShowMiceToExit();
+              gate2.writeMicroseconds(gateOpen);
+              Serial.println("G2 Open");
+              mouseAtA2 = true;
+            }
+            break;
 
-          // Matches another mouse
-        case 2:
-          Serial.println("Mouse other than target detected");
-          Serial.println("CloseMED");
-          Serial.println("Copy Data");
-          AddToExitArray(read);
-          CloseGate2();
-          if (digitalRead(IRSENSOR3pin) == LOW) {
-            Serial.println("Mouse in center");            
-            return ExitFromCenter();
-          } else {
-            Serial.println("Mouse not in center");
-            gate2.writeMicroseconds(gateOpen);
-            Serial.println("G2 Open");
-            return ExitFromOpChamber(read);
-          }
-          break;
+            // Matches another mouse
+          case 2:
+            Serial.println("Mouse other than target detected");
+            Serial.println("CloseMED");
+            Serial.println("Copy Data");
+            AddToExitArray(read);
+            CloseGate2();
+            if (digitalRead(IRSENSOR3pin) == LOW) {
+              Serial.println("Mouse in center");
+              return ExitFromCenter();
+            } else {
+              Serial.println("Mouse not in center");
+              gate2.writeMicroseconds(gateOpen);
+              Serial.println("G2 Open");
+              mouseAtA2 = true;
+            }
+            break;
+        }
       }
     }
   }
