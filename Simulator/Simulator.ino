@@ -165,8 +165,10 @@ void userInput() {
         uint8_t state;
         if (input.substring(3, 4) == "L") {
           state = LOW;
+          Serial.print("Setting LOW ");
         } else {
           state = HIGH;
+          Serial.print("Setting HIGH ");
         }
 
 
@@ -174,15 +176,21 @@ void userInput() {
         switch (input.substring(2, 3).toInt()) {
           case 1:
             irSensor = IR1;
+            Serial.println("IR1");
             break;
           case 2:
             irSensor = IR2;
+            Serial.println("IR2");
             break;
           case 3:
             irSensor = IR3;
+            Serial.println("IR3");
+            break;
         }
-        Logger.println("Pin " + String(irSensor) + ": " + String(state));
         digitalWrite(irSensor, state);
+        Logger.println("IR1: " + String(digitalRead(IR1)));
+        Logger.println("IR2: " + String(digitalRead(IR2)));
+        Logger.println("IR3: " + String(digitalRead(IR3)));
       } else if (input == "SETUP") {
         Logger.println("PREPPING SETUP:");
         Logger.print("Num mice: ");
