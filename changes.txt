@@ -1,0 +1,72 @@
+diff --git a/Sorter-New-Exit/Sorter-New-Exit.ino b/Sorter-New-Exit/Sorter-New-Exit.ino
+index 2f9d2b2..e3d91be 100644
+--- a/Sorter-New-Exit/Sorter-New-Exit.ino
++++ b/Sorter-New-Exit/Sorter-New-Exit.ino
+@@ -30,9 +30,9 @@ Servo gate2;
+ //const int gateOpen = 1350;
+ //const int gateClosed = 1625;
+ 
+-//////Sorter 2 gate settings
+-const int gateOpen = 1250;
+-const int gateClosed = 1550;
++// //////Sorter 2 gate settings
++const int gateOpen = 1325;
++const int gateClosed = 1650;
+ 
+ 
+ //Various Timer values
+@@ -738,10 +738,12 @@ int ExitFromCenter() {
+     digitalWrite(Relay1pin, LOW);
+     digitalWrite(Relay2pin, LOW);
+     digitalWrite(Relay3pin, LOW);
++    delay(500);
+     digitalWrite(Relay2pin, HIGH);
+     String target;
+     bool targetFound = false;
+     elapsedMillis rfidTimer;
++    Serial1.write("RSD\r");
+     while (!targetFound && rfidTimer < 10000) {
+       if (Serial1.available() != 0) {
+         target = Serial1.readString().substring(4, 16);
+@@ -749,13 +751,23 @@ int ExitFromCenter() {
+           AddToExitArray(target);
+           targetFound = true;
+         }
++        else {
++          Serial1.write("RSD\r");
++        }
+       }
+     }
+ 
+     if (!targetFound) {
+       Serial.println("No RFID scanned in middle");
+-      return -1;
+-    } else {
++      if(digitalRead(IRSENSOR3pin) == HIGH) {
++        Serial.println("No mouse detected in middle");
++        return -1;
++      }
++      else {
++        Serial.println("Mouse detected in middle");
++      }
++    } 
++    if (targetFound) {
+       Serial.println("Mouse detected: " + target);
+       digitalWrite(Relay2pin, LOW);
+       digitalWrite(Relay1pin, HIGH);
+@@ -793,6 +805,7 @@ int ExitFromCenter() {
+         Serial.println("Starting exit of unidentified mouse");
+       }
+     }
++    
+   }
+ }
+ 
+@@ -804,6 +817,7 @@ int ExitFromOpChamber(String id) {
+     digitalWrite(Relay1pin, LOW);
+     digitalWrite(Relay2pin, LOW);
+     digitalWrite(Relay3pin, LOW);
++    delay(500);
+     digitalWrite(Relay2pin, HIGH);
+ 
+     Serial.println("G2 Open");

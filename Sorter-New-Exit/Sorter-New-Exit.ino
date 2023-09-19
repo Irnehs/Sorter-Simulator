@@ -678,6 +678,9 @@ void AddToExitArray(String ID) {
       updated[k++] = MiceToExitArray[i];
     }
   }
+  if(numMiceToExit != k+1) {
+    Serial.println("Mouse added: " + String(ID));
+  }
   updated[k] = ID;
   numMiceToExit = k + 1;
   for (int i = 0; i < sizeof(MiceToExitArray) / sizeof(MiceToExitArray[0]); i++) {
@@ -693,6 +696,9 @@ void RemoveFromExitArray(String ID) {
     if (MiceToExitArray[i] != "" && MiceToExitArray[i] != ID) {
       updated[k++] = MiceToExitArray[i];
     }
+  }
+  if(numMiceToExit != k) {
+    Serial.println("Mouse removed: " + String(ID));
   }
   numMiceToExit = k;
   for (int i = 0; i < sizeof(MiceToExitArray) / sizeof(MiceToExitArray[0]); i++) {
@@ -712,6 +718,9 @@ bool WaitingToExit(String ID) {
 
 // Returns index of mouse in IDarray. -1 if not found
 int MouseIsInExperiment(String ID) {
+  if(ID == "") {
+    return -1;
+  }
   for (int i = 0; i < numMice; i++) {
     if (IDarray[i] == ID) {
       return i;
@@ -738,21 +747,19 @@ int ExitFromCenter() {
     digitalWrite(Relay1pin, LOW);
     digitalWrite(Relay2pin, LOW);
     digitalWrite(Relay3pin, LOW);
-    delay(500);
+    delay(1000);
     digitalWrite(Relay2pin, HIGH);
+    delay(1000);
     String target;
     bool targetFound = false;
     elapsedMillis rfidTimer;
-    Serial1.write("RSD\r");
-    while (!targetFound && rfidTimer < 10000) {
+    while (!targetFound && rfidTimer < 5000) {
       if (Serial1.available() != 0) {
         target = Serial1.readString().substring(4, 16);
-        if (target != "" && MouseIsInExperiment(target) != -1) {
+        Serial.println(target);
+        if (MouseIsInExperiment(target) != -1) {
           AddToExitArray(target);
           targetFound = true;
-        }
-        else {
-          Serial1.write("RSD\r");
         }
       }
     }
@@ -794,8 +801,8 @@ int ExitFromCenter() {
       }
       CloseGate1();
       digitalWrite(Relay1pin, LOW);
-      RemoveFromExitArray(target);
       if (digitalRead(IRSENSOR3pin) == HIGH) {
+        RemoveFromExitArray(target);
         Serial.println("Mouse is not in center");
         ShowMiceToExit();
         return numMiceToExit;
